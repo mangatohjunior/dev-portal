@@ -1,0 +1,80 @@
+# Deploy the dev portal to EKS.
+#
+# GitLab is not part of this chart. Point portal.gitlab at the GitLab the
+# portal should call. The portal image must already be in a registry the
+# cluster can pull (typically ECR).
+#
+# Put real passwords in a gitignored values file and install with:
+#   helm upgrade --install dev-portal ./helm/dev-portal \
+#     --namespace dev-portal --create-namespace \
+#     -f helm/dev-portal/values-local.yaml
+#
+# The cluster already runs Istio. This chart attaches a VirtualService to that
+# gateway. It does not create a Gateway or a Kubernetes Ingress.
+# Keycloak is not deployed. The local Keycloak in this repo is for local testing.
+# Production connects to the existing Keycloak through the keycloak.* values.
+
+portal:
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: IfNotPresent
+  # Public origin of the portal, with no trailing slash.
+  # Leave empty to use https://<istio.host> (or http when istio.tls is false).
+  publicUrl: ""
+  gitlab:
+    baseUrl: ""
+    projectId: root/tenant_orchestrator
+    # Browser link in the launch popup. Leave empty to keep the config.py default.
+    pipelinesUrl: ""
+  # Single SQLite file. Do not raise this above 1.
+  replicaCount: 1
+  persistence:
+    size: 1Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  extraEnv: []
+
+# Existing Keycloak. These become the portal environment variables.
+keycloak:
+  # Browser-facing origin, no trailing slash. KEYCLOAK_EXTERNAL_URL.
+  externalUrl: ""
+  # Address the portal pod uses for the token exchange. KEYCLOAK_INTERNAL_URL.
+  internalUrl: ""
+  realm: ""
+  clientId: ""
+  # Leave empty to skip the group check.
+  requiredGroup: ""
+
+# Existing Istio ingress gateway. Find the name with: kubectl get gateway -A
+istio:
+  enabled: true
+  # namespace/name of the Gateway that already receives browser traffic.
+  gateway: ""
+  # Host on that Gateway, for example portal.example.com
+  host: ""
+  # TLS terminates on the Istio gateway. The portal pod receives HTTP.
+  tls: true
+  # Turn on only when the mesh outbound policy is REGISTRY_ONLY.
+  serviceEntries: false
+  # Hostnames the portal calls outside the mesh, such as keycloak and GitLab.
+  externalHosts: []
+
+# Leave these empty here. Set them in values-local.yaml.
+secrets:
+  gitlabToken: ""
+  sessionSecret: ""
+  keycloakClientSecret: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+nodeSelector: {}
+tolerations: []
+affinity: {}

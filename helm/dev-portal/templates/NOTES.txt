@@ -1,0 +1,18 @@
+The portal is at {{ include "dev-portal.portalOrigin" . }}
+{{- if .Values.istio.enabled }}
+
+Browser traffic arrives through the existing Istio gateway {{ .Values.istio.gateway }}.
+Point DNS for {{ .Values.istio.host }} at that gateway. This release does not create a Gateway.
+{{- end }}
+
+This chart deploys only the portal. Sign-in uses the existing Keycloak at {{ include "dev-portal.keycloakOrigin" . }}. The portal pod calls {{ include "dev-portal.keycloakInternal" . }} for the token exchange.
+
+The Keycloak client {{ .Values.keycloak.clientId | quote }} in realm {{ .Values.keycloak.realm | quote }} must allow redirect {{ printf "%s/auth/callback" (include "dev-portal.portalOrigin" .) }} and post-logout redirect {{ printf "%s/login" (include "dev-portal.portalOrigin" .) }}.
+
+GitLab is not deployed by this chart. The portal calls {{ .Values.portal.gitlab.baseUrl }} and triggers {{ .Values.portal.gitlab.projectId }}.
+
+The release ledger is a single SQLite file, so the portal stays at one replica.
+{{- if .Values.keycloak.requiredGroup }}
+
+Sign-in requires membership of {{ .Values.keycloak.requiredGroup }}.
+{{- end }}

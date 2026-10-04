@@ -1,0 +1,6 @@
+apiVersion: v2
+name: dev-portal
+description: Dev portal for EKS. Traffic enters through the existing Istio gateway. Keycloak and GitLab stay outside the cluster.
+type: application
+version: 0.2.0
+appVersion: "0.2.0"

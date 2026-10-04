@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dev-portal.fullname" . }}-portal
+  labels:
+    {{- include "dev-portal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: portal
+data:
+  GITLAB_BASE_URL: {{ required "portal.gitlab.baseUrl is required" .Values.portal.gitlab.baseUrl | quote }}
+  GITLAB_PROJECT_ID: {{ required "portal.gitlab.projectId is required" .Values.portal.gitlab.projectId | quote }}
+  {{- with .Values.portal.gitlab.pipelinesUrl }}
+  GITLAB_ORCHESTRATOR_PIPELINES_URL: {{ . | quote }}
+  {{- end }}
+  KEYCLOAK_INTERNAL_URL: {{ include "dev-portal.keycloakInternal" . | quote }}
+  KEYCLOAK_EXTERNAL_URL: {{ include "dev-portal.keycloakOrigin" . | quote }}
+  KEYCLOAK_REALM: {{ required "keycloak.realm is required" .Values.keycloak.realm | quote }}
+  KEYCLOAK_CLIENT_ID: {{ required "keycloak.clientId is required" .Values.keycloak.clientId | quote }}
+  KEYCLOAK_REDIRECT_URI: {{ printf "%s/auth/callback" (include "dev-portal.portalOrigin" .) | quote }}
+  PORTAL_PUBLIC_URL: {{ include "dev-portal.portalOrigin" . | quote }}
+  KEYCLOAK_REQUIRED_GROUP: {{ .Values.keycloak.requiredGroup | quote }}
+  SESSION_COOKIE_SECURE: {{ hasPrefix "https://" (include "dev-portal.portalOrigin" .) | quote }}
+  SESSION_MAX_AGE_SECONDS: "28800"
+  RELEASES_DB_PATH: /data/releases.db
+  TOKEN_PATH: /mnt/secrets/gitlab-token

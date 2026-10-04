@@ -1,0 +1,115 @@
+{{- if ne (int .Values.portal.replicaCount) 1 }}
+{{- fail "portal.replicaCount must be 1. The release ledger is one SQLite file." }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dev-portal.fullname" . }}-portal
+  labels:
+    {{- include "dev-portal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: portal
+spec:
+  replicas: {{ .Values.portal.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "dev-portal.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: portal
+  template:
+    metadata:
+      labels:
+        {{- include "dev-portal.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: portal
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/portal-configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/portal-secret.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "dev-portal.fullname" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: portal
+          image: "{{ required "portal.image.repository is required" .Values.portal.image.repository }}:{{ required "portal.image.tag is required" .Values.portal.image.tag }}"
+          imagePullPolicy: {{ .Values.portal.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: {{ include "dev-portal.fullname" . }}-portal
+          env:
+            - name: SESSION_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dev-portal.fullname" . }}-portal
+                  key: SESSION_SECRET_KEY
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dev-portal.fullname" . }}-portal
+                  key: KEYCLOAK_CLIENT_SECRET
+            {{- with .Values.portal.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: ledger
+              mountPath: /data
+            - name: gitlab-token
+              mountPath: /mnt/secrets
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /login
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /login
+              port: http
+            periodSeconds: 20
+          startupProbe:
+            httpGet:
+              path: /login
+              port: http
+            periodSeconds: 5
+            failureThreshold: 12
+          resources:
+            {{- toYaml .Values.portal.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: ledger
+          persistentVolumeClaim:
+            claimName: {{ include "dev-portal.fullname" . }}-portal
+        - name: gitlab-token
+          secret:
+            secretName: {{ include "dev-portal.fullname" . }}-portal
+            items:
+              - key: gitlab-token
+                path: gitlab-token
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

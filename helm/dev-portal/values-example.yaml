@@ -1,0 +1,35 @@
+# Copy to values-local.yaml and replace every placeholder.
+# values-local.yaml is gitignored.
+#
+#   helm upgrade --install dev-portal ./helm/dev-portal \
+#     --namespace dev-portal --create-namespace \
+#     -f helm/dev-portal/values-local.yaml
+
+portal:
+  image:
+    repository: 123456789012.dkr.ecr.eu-west-1.amazonaws.com/dev-portal
+    tag: "0.2.0"
+  gitlab:
+    baseUrl: https://gitlab.example.com
+    projectId: root/tenant_orchestrator
+    pipelinesUrl: https://gitlab.example.com/root/tenant_orchestrator/-/pipelines
+
+keycloak:
+  externalUrl: https://keycloak.example.com
+  internalUrl: https://keycloak.example.com
+  realm: company
+  clientId: dev-portal
+  requiredGroup: dev-portal-users
+
+istio:
+  enabled: true
+  gateway: istio-system/istio-ingressgateway
+  host: portal.example.com
+  tls: true
+  serviceEntries: false
+  externalHosts: []
+
+secrets:
+  gitlabToken: replace-with-gitlab-token
+  sessionSecret: replace-with-a-long-random-string
+  keycloakClientSecret: replace-with-keycloak-client-secret

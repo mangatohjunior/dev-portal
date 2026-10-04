@@ -1,0 +1,25 @@
+{{- if and .Values.istio.enabled .Values.istio.serviceEntries }}
+# Used when the mesh only allows registered destinations. Lists the hosts
+# the portal calls outside the cluster (Keycloak and GitLab).
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: {{ include "dev-portal.fullname" . }}-external
+  labels:
+    {{- include "dev-portal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: portal
+spec:
+  hosts:
+    {{- range required "istio.externalHosts is required when istio.serviceEntries is true" .Values.istio.externalHosts }}
+    - {{ . | quote }}
+    {{- end }}
+  location: MESH_EXTERNAL
+  resolution: DNS
+  ports:
+    - number: 443
+      name: https
+      protocol: HTTPS
+    - number: 80
+      name: http
+      protocol: HTTP
+{{- end }}

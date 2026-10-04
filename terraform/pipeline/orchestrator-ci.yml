@@ -1,0 +1,48 @@
+# Portal entrypoint. The app sends TARGET_ENV, TENANT_LIST, PIPELINE_TRIGGER,
+# and the optional taint variables. This pipeline writes a CI file and uses it
+# to trigger one hello-world pipeline per tenant.
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: never
+    - when: always
+
+stages:
+  - generate
+  - trigger
+
+generate-downstream:
+  stage: generate
+  image: alpine:3.20
+  rules:
+    - if: '$TENANT_LIST && $PIPELINE_TRIGGER'
+  script:
+    - echo "TARGET_ENV=${TARGET_ENV}"
+    - echo "TENANT_LIST=${TENANT_LIST}"
+    - echo "PIPELINE_TRIGGER=${PIPELINE_TRIGGER}"
+    - echo "TAINT=${TAINT}"
+    - echo "TRIGGERED_BY=${TRIGGERED_BY}"
+    - echo "CR_NUMBER=${CR_NUMBER}"
+    - echo "REPLACE_RESOURCE=${REPLACE_RESOURCE}"
+    - echo "TF_REFRESH=${TF_REFRESH}"
+    - echo "REPLACE_STATE=${REPLACE_STATE}"
+    - echo "SERVICES_LIST=${SERVICES_LIST}"
+    - sh scripts/generate-downstream.sh
+  artifacts:
+    paths:
+      - generated-ci.yml
+
+trigger-downstream:
+  stage: trigger
+  needs:
+    - job: generate-downstream
+      artifacts: true
+  rules:
+    - if: '$TENANT_LIST && $PIPELINE_TRIGGER'
+  trigger:
+    include:
+      - artifact: generated-ci.yml
+        job: generate-downstream
+    strategy: depend
+    forward:
+      pipeline_variables: true

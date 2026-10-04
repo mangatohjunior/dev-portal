@@ -1,0 +1,78 @@
+{
+  "realm": "dev-portal",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "clients": [
+    {
+      "clientId": "dev-portal",
+      "name": "Dev Portal",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "dev-portal-secret",
+      "redirectUris": ["http://localhost:8000/*"],
+      "webOrigins": ["http://localhost:8000"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:8000/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups"
+          }
+        }
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "dev-portal-users",
+      "path": "/dev-portal-users"
+    }
+  ],
+  "users": [
+    {
+      "username": "devportal-user",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "devportal-user@example.com",
+      "firstName": "Dev",
+      "lastName": "Portal",
+      "groups": ["/dev-portal-users"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "devportal-pass",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "outsider-user",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "outsider-user@example.com",
+      "firstName": "Outsider",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "outsider-pass",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

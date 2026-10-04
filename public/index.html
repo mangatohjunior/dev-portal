@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deploy · Dev portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .btn-rocket { transition: transform 0.2s ease; }
+        #executePipeline:hover:not(:disabled) .btn-rocket { transform: translateY(-2px) rotate(-20deg); }
+        #executePipeline:disabled .btn-rocket { animation: rocket-wiggle 0.45s ease-in-out infinite; }
+        @keyframes rocket-wiggle {
+            50% { transform: translateY(-1px) rotate(-12deg); }
+        }
+        .loader { position: relative; width: 84px; height: 84px; }
+        .loader-ring {
+            position: absolute;
+            inset: 0;
+            border-radius: 999px;
+            background: conic-gradient(from 90deg, rgba(29, 78, 216, 0) 0%, #1d4ed8 52%, #bfdbfe 78%, rgba(29, 78, 216, 0) 100%);
+            animation: loader-spin 0.9s linear infinite;
+            -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+            mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+        }
+        .loader-core {
+            position: absolute;
+            inset: 18px;
+            display: grid;
+            place-items: center;
+            border-radius: 999px;
+            background: radial-gradient(circle at 40% 35%, #fff, #dbeafe 60%, #eff6ff);
+            box-shadow: 0 0 0 8px rgba(29, 78, 216, 0.08);
+            animation: loader-pulse 1.6s ease-in-out infinite;
+            color: #1d4ed8;
+        }
+        @keyframes loader-spin { to { transform: rotate(360deg); } }
+        @keyframes loader-pulse { 50% { transform: scale(0.92); } }
+        @media (prefers-reduced-motion: reduce) {
+            .loader-ring, .loader-core { animation: none; }
+        }
+        #launchStage { overflow: hidden; }
+        .launch-sky {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            background:
+                radial-gradient(ellipse at 50% 110%, rgba(29, 78, 216, 0.22), transparent 52%),
+                linear-gradient(to top, transparent, rgba(15, 39, 68, 0.04));
+        }
+        .rocket-flight {
+            position: absolute;
+            left: 50%;
+            bottom: 16%;
+            width: 76px;
+            margin-left: -38px;
+            filter: drop-shadow(0 12px 18px rgba(29, 78, 216, 0.35));
+        }
+        .flame { transform-origin: 32px 98px; transform-box: fill-box; }
+        .launch-caption {
+            position: absolute;
+            left: 50%;
+            top: 4.6rem;
+            opacity: 0;
+            transform: translateX(-50%);
+            color: #1e3a8a;
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            white-space: nowrap;
+            background: #fff;
+            border: 1px solid #bfdbfe;
+            border-radius: 999px;
+            padding: 0.45rem 0.9rem;
+            box-shadow: 0 10px 30px rgba(29, 78, 216, 0.16);
+        }
+        #launchStage.is-launching .launch-sky { animation: sky-in 2.3s ease forwards; }
+        #launchStage.is-launching .rocket-flight { animation: liftoff 2.15s cubic-bezier(.18, .7, .2, 1) forwards; }
+        #launchStage.is-launching .flame { animation: flicker 0.12s steps(2) infinite; }
+        #launchStage.is-launching .launch-caption { animation: caption 2.15s ease forwards; }
+        #launchStage.is-reduced .launch-caption { animation: caption-still 1.4s ease forwards; }
+        @keyframes sky-in {
+            0% { opacity: 0; }
+            14% { opacity: 1; }
+            72% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        @keyframes liftoff {
+            0% { transform: translateY(24px) scale(0.65); opacity: 0; }
+            14% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-108vh) scale(0.5) rotate(-8deg); opacity: 0; }
+        }
+        @keyframes flicker {
+            50% { transform: scale(1.18, 0.72); }
+        }
+        @keyframes caption {
+            0%, 18% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            34%, 68% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+        }
+        @keyframes caption-still {
+            0%, 100% { opacity: 0; }
+            20%, 80% { opacity: 1; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            #executePipeline:disabled .btn-rocket,
+            #launchStage.is-launching .rocket-flight,
+            #launchStage.is-launching .flame,
+            #launchStage.is-launching .launch-sky { animation: none; }
+            #launchStage.is-launching .launch-caption { animation: caption-still 1.4s ease forwards; }
+        }
+    </style>
+</head>
+<body class="bg-[#f4f3ef] text-stone-900 min-h-screen antialiased">
+
+    <header class="border-b border-stone-200 border-t-[3px] border-t-blue-700 bg-white">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-6">
+                <a href="/" class="flex items-center gap-2.5">
+                    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+                        <rect width="28" height="28" rx="8" fill="#1d4ed8"/>
+                        <path d="M11 9l7 5-7 5" fill="none" stroke="#fafaf9" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span class="text-[15px] font-semibold tracking-tight">Dev portal</span>
+                </a>
+                <nav class="flex items-center gap-1" aria-label="Primary">
+                    <a href="/" class="rounded-md bg-blue-700 px-3 py-1.5 text-sm font-medium text-white" aria-current="page">Deploy</a>
+                    <a href="/releases" class="rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-blue-50 hover:text-blue-800">Releases</a>
+                </nav>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="currentUser" class="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 py-1 pl-1 pr-3">
+                    <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-blue-700 text-white" aria-hidden="true">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    </span>
+                    <span id="currentUserName" class="text-sm font-medium text-stone-800"></span>
+                </div>
+                <a href="/logout" class="text-sm font-medium text-stone-500 hover:text-blue-800">Sign out</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-2xl mx-auto px-4 sm:px-6 py-10">
+        <div class="mb-8">
+            <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-blue-700">New release</p>
+            <h1 class="mt-2 text-[1.75rem] font-semibold tracking-tight">Trigger a pipeline</h1>
+            <p class="mt-2 text-sm leading-relaxed text-stone-600">Choose the environment, the tenants, and the pipeline. Production stays locked until you confirm it and attach a change request.</p>
+        </div>
+
+        <form id="deployForm" class="rounded-2xl border border-stone-200 bg-white shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
+            <div class="space-y-8 p-6 sm:p-8">
+                <fieldset>
+                    <legend class="text-sm font-medium text-stone-900">Environment</legend>
+                    <div id="envPicker" class="mt-3 grid grid-cols-4 gap-1 rounded-xl bg-stone-100 p-1" role="group" aria-label="Target environment">
+                        <button type="button" data-env="dev" class="env-option inline-flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium"><span class="h-2 w-2 rounded-full bg-blue-600"></span>Dev</button>
+                        <button type="button" data-env="test" class="env-option inline-flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium"><span class="h-2 w-2 rounded-full bg-cyan-600"></span>Test</button>
+                        <button type="button" data-env="preprod" class="env-option inline-flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium"><span class="h-2 w-2 rounded-full bg-amber-500"></span>Pre-prod</button>
+                        <button type="button" data-env="prod" class="env-option inline-flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium"><span class="h-2 w-2 rounded-full bg-rose-600"></span>Prod</button>
+                    </div>
+                    <select id="targetEnv" required class="hidden" tabindex="-1" aria-hidden="true">
+                        <option value="dev">Dev</option>
+                        <option value="test">Test</option>
+                        <option value="preprod">Pre-Prod</option>
+                        <option value="prod">Prod</option>
+                    </select>
+                </fieldset>
+
+                <div id="prodPanel" class="hidden space-y-4 rounded-xl border border-rose-200 bg-rose-50 p-4">
+                    <div class="flex items-start gap-3">
+                        <input type="checkbox" id="allowProd" class="mt-0.5 h-4 w-4 rounded border-rose-300 text-rose-700 focus:ring-rose-600">
+                        <label for="allowProd" class="text-sm text-stone-800">
+                            <span class="font-medium">Allow this production trigger</span>
+                            <span class="mt-0.5 block text-stone-500">Required in addition to the change request. Leave this off unless you intend to ship.</span>
+                        </label>
+                    </div>
+                    <div id="crRow" class="hidden">
+                        <label for="crNumber" class="block text-sm font-medium text-stone-900">Change request</label>
+                        <input type="text" id="crNumber" placeholder="CHG0012345" autocomplete="off" spellcheck="false"
+                               pattern="[A-Za-z0-9][A-Za-z0-9-]{2,31}"
+                               class="mt-2 w-full rounded-lg border border-rose-200 bg-white px-3 py-2.5 font-mono text-sm uppercase text-rose-900 outline-none focus:border-rose-600 focus:ring-2 focus:ring-rose-600/15">
+                        <p class="mt-2 text-xs leading-relaxed text-stone-500">Recorded on the production ledger with your name and the release time.</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="tenantList" class="block text-sm font-medium text-stone-900">Tenants</label>
+                    <input type="text" id="tenantList" required placeholder="atlas, borealis"
+                           class="mt-2 w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-stone-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-700/15">
+                    <p class="mt-2 text-xs text-stone-500">Comma-separated list of tenants in this release.</p>
+                </div>
+
+                <div>
+                    <label for="pipelineTrigger" class="block text-sm font-medium text-stone-900">Pipeline</label>
+                    <select id="pipelineTrigger" required class="mt-2 w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/15">
+                        <option value="" disabled selected>Select a pipeline</option>
+                        <option value="tenant_baseline">Tenant baseline</option>
+                        <option value="kasm_vdi">Kasm VDI</option>
+                        <option value="tenant_services">Tenant services</option>
+                    </select>
+                </div>
+
+                <div class="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+                    <div class="flex items-start gap-3">
+                        <input type="checkbox" id="taintFlag" class="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-700 focus:ring-amber-600">
+                        <label for="taintFlag" class="text-sm text-stone-800">
+                            <span class="font-medium">Replace existing resources</span>
+                            <span class="mt-0.5 block text-stone-500">Taint the selected Terraform resources so the pipeline destroys and recreates them.</span>
+                        </label>
+                    </div>
+
+                    <div id="dynamicSections" class="mt-4 hidden border-t border-stone-200 pt-4">
+                        <div id="section-baseline" class="hidden space-y-4">
+                            <div>
+                                <label for="replaceResource" class="block text-sm font-medium text-stone-800">Resource to replace</label>
+                                <input type="text" id="replaceResource" placeholder="module.database" class="mt-2 w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-stone-900 focus:ring-2 focus:ring-stone-900/10">
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" id="tfRefresh" checked class="h-4 w-4 rounded border-amber-300 text-amber-700 focus:ring-amber-600">
+                                <label for="tfRefresh" class="text-sm text-stone-700">Refresh Terraform state before replace</label>
+                            </div>
+                        </div>
+
+                        <div id="section-kasm" class="hidden">
+                            <label for="replaceState" class="block text-sm font-medium text-stone-800">Replace state</label>
+                            <input type="text" id="replaceState" value="KASM" class="mt-2 w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 font-mono text-sm outline-none focus:border-stone-900 focus:ring-2 focus:ring-stone-900/10">
+                        </div>
+
+                        <div id="section-services" class="hidden">
+                            <p class="text-sm font-medium text-stone-800">Services to replace</p>
+                            <div class="mt-3 grid grid-cols-2 gap-2" id="servicesGrid"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-stone-200 px-6 py-4 sm:px-8">
+                <button type="submit" id="executePipeline" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-700 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-800 disabled:cursor-wait disabled:bg-blue-800">
+                    <svg class="btn-rocket h-4 w-4" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+                        <path d="M12 2c2.2 3.2 3.2 6.1 3.2 8.6v4.2h-6.4v-4.2C8.8 8.1 9.8 5.2 12 2z"/>
+                        <circle cx="12" cy="9.2" r="1.3" fill="#bfdbfe"/>
+                        <path d="M8.8 13.2 5.2 18.4 8.8 16.6zM15.2 13.2l3.6 5.2-3.6-1.8z"/>
+                        <path d="M10.4 16.2h3.2l-.6 2.4c-.4 1.5-.6 2-.6 2s-.2-.5-.6-2l-.6-2.4z" fill="#fdba74"/>
+                    </svg>
+                    <span id="executeLabel">Trigger pipeline</span>
+                </button>
+            </div>
+        </form>
+    </main>
+
+    <div id="launchStage" class="pointer-events-none fixed inset-0 z-50 hidden" aria-hidden="true">
+        <div class="launch-sky"></div>
+        <div class="rocket-flight">
+            <svg viewBox="0 0 64 128" class="h-auto w-full" aria-hidden="true">
+                <g class="flame">
+                    <ellipse cx="32" cy="112" rx="7" ry="14" fill="#fb923c"/>
+                    <ellipse cx="32" cy="106" rx="4" ry="9" fill="#fde68a"/>
+                </g>
+                <path d="M32 6c8 16 14 34 14 54v28H18V60C18 40 24 22 32 6z" fill="#fafaf9" stroke="#1d4ed8" stroke-width="3"/>
+                <circle cx="32" cy="52" r="7" fill="#1d4ed8"/>
+                <path d="M18 74 6 104l12-10zM46 74l12 30-12-10z" fill="#1d4ed8"/>
+            </svg>
+        </div>
+        <p class="launch-caption">Release launched</p>
+    </div>
+
+    <div id="launchPopup" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-labelledby="statusLoadingTitle">
+        <div class="absolute inset-0 bg-[#0f2744]/40" data-close-popup></div>
+        <div class="relative mx-auto mt-24 w-[min(32rem,calc(100%-2rem))] rounded-2xl border border-stone-200 bg-white p-6 shadow-[0_20px_50px_rgba(15,39,68,0.18)]">
+            <div id="statusLoading" class="flex flex-col items-center px-2 py-4 text-center">
+                <div class="loader" aria-hidden="true">
+                    <span class="loader-ring"></span>
+                    <span class="loader-core">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2c2.2 3.2 3.2 6.1 3.2 8.6v4.2h-6.4v-4.2C8.8 8.1 9.8 5.2 12 2z"/>
+                            <path d="M8.8 13.2 5.2 18.4 8.8 16.6zM15.2 13.2l3.6 5.2-3.6-1.8z"/>
+                        </svg>
+                    </span>
+                </div>
+                <h2 id="statusLoadingTitle" class="mt-5 text-lg font-semibold tracking-tight text-stone-900">Waiting for the pipeline</h2>
+                <p id="statusLoadingText" class="mt-2 text-sm leading-relaxed text-stone-600">Sending the trigger…</p>
+            </div>
+            <div id="statusResult" class="hidden">
+                <h2 id="statusResultTitle" class="text-lg font-semibold tracking-tight text-stone-900"></h2>
+                <p id="statusResultBody" class="mt-2 hidden text-sm leading-relaxed text-stone-600"></p>
+                <a id="statusHistory" href="/releases" class="mt-4 hidden text-sm font-medium text-blue-700 underline underline-offset-2">View release history</a>
+                <div id="statusOrchestrator" class="mt-4 hidden border-t border-stone-200 pt-4">
+                    <p class="text-sm font-medium text-stone-900">Tenant Orchestrator has been Launched</p>
+                    <p class="mt-1 text-sm leading-relaxed text-stone-600">Please follow the link to view the progress of the pipelines.</p>
+                    <a id="launchPopupLink" class="mt-3 block break-all text-sm font-medium text-blue-700 underline underline-offset-2" target="_blank" rel="noopener noreferrer"></a>
+                </div>
+                <button type="button" id="launchPopupClose" class="mt-5 inline-flex rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        fetch('/api/me').then(r => r.ok ? r.json() : null).then(user => {
+            if (!user) return;
+            document.getElementById('currentUserName').textContent = user.preferred_username || user.email || '';
+        });
+
+        const services = ['airflow', 'cloudbeaver', 'gitlab_runner', 'immuta', 'jupyterhub', 'mlflow', 's3uploader', 'superset'];
+        const servicesGrid = document.getElementById('servicesGrid');
+
+        services.forEach(service => {
+            const div = document.createElement('label');
+            div.className = 'flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm text-stone-700';
+            div.innerHTML = `<input type="checkbox" id="srv_${service}" value="${service}" class="service-checkbox h-4 w-4 rounded border-amber-300 text-amber-700">`;
+            const name = document.createElement('span');
+            name.textContent = service.replace('_', ' ');
+            div.appendChild(name);
+            servicesGrid.appendChild(div);
+        });
+
+        const triggerSelect = document.getElementById('pipelineTrigger');
+        const taintCheckbox = document.getElementById('taintFlag');
+        const dynamicContainer = document.getElementById('dynamicSections');
+
+        const sectionBaseline = document.getElementById('section-baseline');
+        const sectionKasm = document.getElementById('section-kasm');
+        const sectionServices = document.getElementById('section-services');
+
+        function updateDynamicUI() {
+            dynamicContainer.classList.add('hidden');
+            sectionBaseline.classList.add('hidden');
+            sectionKasm.classList.add('hidden');
+            sectionServices.classList.add('hidden');
+
+            if (taintCheckbox.checked && triggerSelect.value) {
+                dynamicContainer.classList.remove('hidden');
+                if (triggerSelect.value === 'tenant_baseline') sectionBaseline.classList.remove('hidden');
+                if (triggerSelect.value === 'kasm_vdi') sectionKasm.classList.remove('hidden');
+                if (triggerSelect.value === 'tenant_services') sectionServices.classList.remove('hidden');
+            }
+        }
+
+        triggerSelect.addEventListener('change', updateDynamicUI);
+        taintCheckbox.addEventListener('change', updateDynamicUI);
+
+        const targetEnv = document.getElementById('targetEnv');
+        const prodPanel = document.getElementById('prodPanel');
+        const crRow = document.getElementById('crRow');
+        const crNumber = document.getElementById('crNumber');
+
+        const ENV_SELECTED = {
+            dev: 'bg-blue-50 text-blue-800 ring-1 ring-blue-200',
+            test: 'bg-cyan-50 text-cyan-900 ring-1 ring-cyan-200',
+            preprod: 'bg-amber-50 text-amber-900 ring-1 ring-amber-200',
+            prod: 'bg-rose-50 text-rose-800 ring-1 ring-rose-200',
+        };
+
+        function paintEnv() {
+            const current = targetEnv.value;
+            document.querySelectorAll('[data-env]').forEach(button => {
+                const on = button.dataset.env === current;
+                button.setAttribute('aria-pressed', on ? 'true' : 'false');
+                const tone = on ? ENV_SELECTED[button.dataset.env] : 'text-stone-600 hover:bg-white/70';
+                button.className = 'env-option inline-flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium ' + tone;
+            });
+        }
+
+        function updateProdControls() {
+            const isProd = targetEnv.value === 'prod';
+            prodPanel.classList.toggle('hidden', !isProd);
+            crRow.classList.toggle('hidden', !isProd);
+            crNumber.required = isProd;
+            paintEnv();
+        }
+
+        document.querySelectorAll('[data-env]').forEach(button => {
+            button.addEventListener('click', () => {
+                targetEnv.value = button.dataset.env;
+                updateProdControls();
+            });
+        });
+
+        targetEnv.addEventListener('change', updateProdControls);
+        updateProdControls();
+
+        document.getElementById('deployForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const payload = {
+                targetEnvironment: document.getElementById('targetEnv').value,
+                allowProd: document.getElementById('allowProd').checked,
+                tenantList: document.getElementById('tenantList').value,
+                pipelineTrigger: document.getElementById('pipelineTrigger').value,
+                taint: document.getElementById('taintFlag').checked
+            };
+
+            if (payload.targetEnvironment === 'prod') {
+                payload.crNumber = document.getElementById('crNumber').value.trim();
+            }
+
+            if (payload.taint) {
+                if (payload.pipelineTrigger === 'tenant_baseline') {
+                    payload.replaceResource = document.getElementById('replaceResource').value;
+                    payload.tfRefresh = document.getElementById('tfRefresh').checked;
+                } else if (payload.pipelineTrigger === 'kasm_vdi') {
+                    payload.replaceState = document.getElementById('replaceState').value;
+                } else if (payload.pipelineTrigger === 'tenant_services') {
+                    const selectedServices = Array.from(document.querySelectorAll('.service-checkbox:checked')).map(cb => cb.value);
+                    payload.services = selectedServices;
+                }
+            }
+
+            const executeButton = document.getElementById('executePipeline');
+            const executeLabel = document.getElementById('executeLabel');
+            executeButton.disabled = true;
+            executeLabel.textContent = 'Waiting for pipeline…';
+            showLoading('Sending the trigger…');
+
+            try {
+                const res = await fetch('/api/trigger-deployment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    const detail = detailMessage(data.detail);
+                    showResult(res.status === 409 && detail ? detail : failureText(detail));
+                    return;
+                }
+
+                const pipelineId = Number(data.pipelineId);
+                if (!Number.isInteger(pipelineId) || pipelineId < 1) {
+                    showResult('Pipeline failed. GitLab did not return a pipeline id.');
+                    return;
+                }
+
+                showLoading('Pipeline #' + pipelineId + ' is running.');
+                const outcome = await waitForPipeline(pipelineId, (status) => {
+                    showLoading('Pipeline #' + pipelineId + ' is ' + status + '.');
+                });
+
+                if (outcome === 'success') {
+                    hideLaunchPopup();
+                    playLaunch(pipelineId, data.orchestratorPipelinesUrl);
+                } else if (outcome === 'timeout') {
+                    showResult('Pipeline #' + pipelineId + ' is still running. Check GitLab for the result.');
+                } else if (outcome === 'canceled') {
+                    showResult('Pipeline #' + pipelineId + ' was canceled.');
+                } else {
+                    showResult('Pipeline #' + pipelineId + ' failed.');
+                }
+            } catch (err) {
+                console.error(err);
+                showResult('Pipeline failed. The portal could not reach the server.');
+            } finally {
+                executeButton.disabled = false;
+                executeLabel.textContent = 'Trigger pipeline';
+            }
+        });
+
+        function detailMessage(detail) {
+            if (typeof detail === 'string') return detail;
+            if (Array.isArray(detail)) {
+                const first = detail.find(item => item && typeof item.msg === 'string');
+                if (first) return first.msg.replace(/^Value error,\s*/i, '');
+            }
+            return '';
+        }
+
+        function failureText(detail) {
+            if (detail) return 'Pipeline failed. ' + detail;
+            return 'Pipeline failed.';
+        }
+
+        async function waitForPipeline(pipelineId, onUpdate) {
+            const started = Date.now();
+            const limit = 4 * 60 * 1000;
+            let failures = 0;
+            while (Date.now() - started < limit) {
+                let res;
+                try {
+                    res = await fetch('/api/pipelines/' + pipelineId);
+                } catch (err) {
+                    failures += 1;
+                    if (failures >= 3) throw err;
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    continue;
+                }
+                if (!res.ok) {
+                    failures += 1;
+                    if (failures >= 3) return 'failed';
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    continue;
+                }
+                failures = 0;
+                const data = await res.json();
+                if (data.status === 'success') return 'success';
+                if (data.status === 'failed' || data.status === 'canceled' || data.status === 'skipped') return data.status;
+                if (data.status) onUpdate(data.status);
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+            return 'timeout';
+        }
+
+        const launchPopup = document.getElementById('launchPopup');
+        const statusLoading = document.getElementById('statusLoading');
+        const statusResult = document.getElementById('statusResult');
+        const launchPopupLink = document.getElementById('launchPopupLink');
+
+        function showLoading(text) {
+            statusLoading.classList.remove('hidden');
+            statusResult.classList.add('hidden');
+            document.getElementById('statusLoadingText').textContent = text;
+            launchPopup.setAttribute('aria-labelledby', 'statusLoadingTitle');
+            launchPopup.classList.remove('hidden');
+        }
+
+        function showResult(title, options) {
+            options = options || {};
+            statusLoading.classList.add('hidden');
+            statusResult.classList.remove('hidden');
+            document.getElementById('statusResultTitle').textContent = title;
+            const body = document.getElementById('statusResultBody');
+            body.textContent = options.body || '';
+            body.classList.toggle('hidden', !options.body);
+            document.getElementById('statusHistory').classList.toggle('hidden', !options.history);
+            const orchestrator = document.getElementById('statusOrchestrator');
+            const safe = typeof options.url === 'string' && (options.url.startsWith('https://') || options.url.startsWith('http://'));
+            orchestrator.classList.toggle('hidden', !safe);
+            if (safe) {
+                launchPopupLink.href = options.url;
+                launchPopupLink.textContent = options.url;
+            }
+            launchPopup.setAttribute('aria-labelledby', 'statusResultTitle');
+            launchPopup.classList.remove('hidden');
+            document.getElementById('launchPopupClose').focus();
+        }
+
+        function hideLaunchPopup() {
+            launchPopup.classList.add('hidden');
+        }
+
+        document.getElementById('launchPopupClose').addEventListener('click', hideLaunchPopup);
+        launchPopup.addEventListener('click', (event) => {
+            if (event.target.hasAttribute('data-close-popup')) hideLaunchPopup();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !launchPopup.classList.contains('hidden')) hideLaunchPopup();
+        });
+
+        function playLaunch(pipelineId, pipelinesUrl) {
+            const stage = document.getElementById('launchStage');
+            const rocket = stage.querySelector('.rocket-flight');
+            let finished = false;
+            const finishLaunch = () => {
+                if (finished) return;
+                finished = true;
+                stage.classList.add('hidden');
+                stage.classList.remove('is-launching', 'is-reduced');
+                showResult('Pipeline #' + pipelineId + ' ran successfully.', {
+                    history: true,
+                    url: pipelinesUrl,
+                });
+            };
+            stage.classList.remove('hidden', 'is-launching', 'is-reduced');
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reduce) {
+                stage.classList.add('is-reduced');
+                window.setTimeout(finishLaunch, 1400);
+                return;
+            }
+            window.requestAnimationFrame(() => stage.classList.add('is-launching'));
+            const finish = (event) => {
+                if (event.target !== rocket || event.animationName !== 'liftoff') return;
+                rocket.removeEventListener('animationend', finish);
+                finishLaunch();
+            };
+            rocket.addEventListener('animationend', finish);
+        }
+    </script>
+</body>
+</html>

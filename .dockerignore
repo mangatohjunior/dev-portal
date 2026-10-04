@@ -1,0 +1,17 @@
+# Keep the Docker build context minimal and free of anything sensitive/unnecessary.
+.git/
+.gitignore
+README.md
+.env
+.env.*
+docker-compose.override.yaml
+docker-compose.override.yml
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.vscode/
+.idea/
+keycloak/
+tests/
+data/

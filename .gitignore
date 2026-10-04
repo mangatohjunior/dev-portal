@@ -1,0 +1,31 @@
+# Secrets / local overrides — never commit real credentials here.
+.env
+.env.*
+docker-compose.override.yaml
+docker-compose.override.yml
+mock-secrets/gitlab-token.local
+helm/**/values-local.yaml
+
+# Terraform local state
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Release ledger (local audit data)
+data/
+*.db
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

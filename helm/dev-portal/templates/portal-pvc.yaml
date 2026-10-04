@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "dev-portal.fullname" . }}-portal
+  labels:
+    {{- include "dev-portal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: portal
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.portal.persistence.size }}
+  {{- with .Values.portal.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}

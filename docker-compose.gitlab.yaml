@@ -1,0 +1,49 @@
+# Local GitLab CE for exercising the portal and the Terraform tenant projects.
+# Start with the main stack:
+#   docker compose -f docker-compose.yaml -f docker-compose.gitlab.yaml up -d
+#
+# GitLab listens on http://localhost:8929 (8080 is Keycloak, 8000 is the portal).
+# First boot takes several minutes and the container needs about 4 GB of RAM.
+
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:17.11.5-ce.0
+    hostname: localhost
+    shm_size: "256m"
+    ports:
+      - "8929:8929"
+      - "2224:22"
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://localhost:8929'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2224
+        nginx['listen_port'] = 8929
+        nginx['listen_https'] = false
+        letsencrypt['enable'] = false
+        prometheus_monitoring['enable'] = false
+        puma['worker_processes'] = 0
+        sidekiq['max_concurrency'] = 10
+    volumes:
+      - gitlab-config:/etc/gitlab
+      - gitlab-logs:/var/log/gitlab
+      - gitlab-data:/var/opt/gitlab
+    healthcheck:
+      test: ["CMD", "/opt/gitlab/bin/gitlab-healthcheck", "--fail"]
+      interval: 30s
+      timeout: 30s
+      retries: 20
+      start_period: 180s
+
+  gitlab-runner:
+    image: gitlab/gitlab-runner:v17.11.0
+    extra_hosts:
+      - "localhost:host-gateway"
+    volumes:
+      - gitlab-runner-config:/etc/gitlab-runner
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  gitlab-config:
+  gitlab-logs:
+  gitlab-data:
+  gitlab-runner-config:

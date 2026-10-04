@@ -1,0 +1,23 @@
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: {{ include "dev-portal.fullname" . }}-portal
+  labels:
+    {{- include "dev-portal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: portal
+spec:
+  hosts:
+    - {{ required "istio.host is required" .Values.istio.host | quote }}
+  gateways:
+    - {{ required "istio.gateway is required" .Values.istio.gateway | quote }}
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: {{ include "dev-portal.fullname" . }}-portal
+            port:
+              number: 8000
+{{- end }}

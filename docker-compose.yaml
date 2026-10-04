@@ -1,0 +1,44 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      # Fixed hostname so the token issuer is consistent whether Keycloak is
+      # reached via the browser (localhost:8080) or the backend (keycloak:8080).
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: "8080"
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+
+  portal:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # Maps the local folder to the container's path, read-only
+      - ./mock-secrets:/mnt/secrets:ro
+      # Release ledger. Survives container recreate; not the GitLab token.
+      - ./data:/data
+    environment:
+      RELEASES_DB_PATH: /data/releases.db
+      # Portal container reaches GitLab on the host port, then triggers tenant_orchestrator.
+      GITLAB_BASE_URL: http://host.docker.internal:8929
+      GITLAB_PROJECT_ID: root/tenant_orchestrator
+      # Browser link shown after a successful launch. localhost, not the container API host.
+      GITLAB_ORCHESTRATOR_PIPELINES_URL: http://localhost:8929/root/tenant_orchestrator/-/pipelines
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      KEYCLOAK_EXTERNAL_URL: http://localhost:8080
+      KEYCLOAK_REALM: dev-portal
+      KEYCLOAK_CLIENT_ID: dev-portal
+      KEYCLOAK_CLIENT_SECRET: dev-portal-secret
+      KEYCLOAK_REDIRECT_URI: http://localhost:8000/auth/callback
+      PORTAL_PUBLIC_URL: http://localhost:8000
+      KEYCLOAK_REQUIRED_GROUP: dev-portal-users
+      SESSION_SECRET_KEY: dev-session-secret-change-me
+    depends_on:
+      - keycloak

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Releases · Dev portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#f4f3ef] text-stone-900 min-h-screen antialiased">
+
+    <header class="border-b border-stone-200 border-t-[3px] border-t-blue-700 bg-white">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-6">
+                <a href="/" class="flex items-center gap-2.5">
+                    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+                        <rect width="28" height="28" rx="8" fill="#1d4ed8"/>
+                        <path d="M11 9l7 5-7 5" fill="none" stroke="#fafaf9" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span class="text-[15px] font-semibold tracking-tight">Dev portal</span>
+                </a>
+                <nav class="flex items-center gap-1" aria-label="Primary">
+                    <a href="/" class="rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 hover:bg-blue-50 hover:text-blue-800">Deploy</a>
+                    <a href="/releases" class="rounded-md bg-blue-700 px-3 py-1.5 text-sm font-medium text-white" aria-current="page">Releases</a>
+                </nav>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="currentUser" class="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 py-1 pl-1 pr-3">
+                    <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-blue-700 text-white" aria-hidden="true">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    </span>
+                    <span id="currentUserName" class="text-sm font-medium text-stone-800"></span>
+                </div>
+                <a href="/logout" class="text-sm font-medium text-stone-500 hover:text-blue-800">Sign out</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-blue-700">History</p>
+                <h1 class="mt-2 text-[1.75rem] font-semibold tracking-tight">Releases</h1>
+                <p class="mt-2 max-w-xl text-sm leading-relaxed text-stone-600">Each point is a pipeline GitLab accepted. Times on the chart use your local timezone. The ledger below is production only, in UTC.</p>
+            </div>
+            <div class="inline-flex rounded-lg bg-blue-100/70 p-1" id="windowButtons" role="group" aria-label="Chart time window"></div>
+        </div>
+
+        <section class="rounded-2xl border border-stone-200 bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.04)] sm:p-6">
+            <div class="mb-4 flex flex-wrap gap-x-5 gap-y-2" id="envLegend"></div>
+            <div id="chartHost" class="w-full overflow-x-auto"></div>
+            <p id="chartEmpty" class="hidden py-12 text-center text-sm text-stone-500">No releases in this window. A release is recorded only after GitLab accepts the pipeline trigger.</p>
+            <div id="releaseDetail" class="mt-4 min-h-[3rem] rounded-xl border border-blue-100 bg-blue-50/50 p-4 text-sm text-stone-700"></div>
+        </section>
+
+        <section class="rounded-2xl border border-stone-200 bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.04)] sm:p-6">
+            <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-semibold tracking-tight">Production ledger</h2>
+                    <p class="mt-1 max-w-xl text-sm leading-relaxed text-stone-600">Production releases only. Dev, test, and pre-prod stay on the chart and are excluded from this export.</p>
+                </div>
+                <a href="/api/releases/audit.csv" download="prod-releases.csv"
+                   class="inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-800 hover:bg-blue-100">
+                    Download CSV
+                </a>
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-stone-200">
+                <table class="min-w-full text-left text-sm">
+                    <thead class="bg-rose-50/80 text-[11px] uppercase tracking-[0.12em] text-rose-900/70">
+                        <tr>
+                            <th class="px-4 py-3 font-medium">User</th>
+                            <th class="px-4 py-3 font-medium">Date (UTC)</th>
+                            <th class="px-4 py-3 font-medium">Time (UTC)</th>
+                            <th class="px-4 py-3 font-medium">CR number</th>
+                            <th class="px-4 py-3 font-medium">Tenants</th>
+                            <th class="px-4 py-3 font-medium">Trigger</th>
+                            <th class="px-4 py-3 font-medium">Change</th>
+                            <th class="px-4 py-3 font-medium">Pipeline</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditBody" class="divide-y divide-stone-100"></tbody>
+                </table>
+            </div>
+            <p id="auditEmpty" class="hidden py-8 text-center text-sm text-stone-500">No production releases recorded.</p>
+        </section>
+    </main>
+
+    <script>
+        const ENVIRONMENTS = [
+            { id: 'prod', label: 'Prod', color: '#e11d48', lane: '#fff1f2' },
+            { id: 'preprod', label: 'Pre-prod', color: '#d97706', lane: '#fffbeb' },
+            { id: 'test', label: 'Test', color: '#0891b2', lane: '#ecfeff' },
+            { id: 'dev', label: 'Dev', color: '#2563eb', lane: '#eff6ff' },
+        ];
+        const WINDOWS = [
+            { id: '24h', label: '24 hours', ms: 24 * 60 * 60 * 1000 },
+            { id: '7d', label: '7 days', ms: 7 * 24 * 60 * 60 * 1000 },
+            { id: '30d', label: '30 days', ms: 30 * 24 * 60 * 60 * 1000 },
+            { id: 'all', label: 'All', ms: null },
+        ];
+        const TRIGGER_LABELS = {
+            tenant_baseline: 'Tenant baseline',
+            kasm_vdi: 'Kasm VDI',
+            tenant_services: 'Tenant services',
+        };
+        const SVG_NS = 'http://www.w3.org/2000/svg';
+
+        let allReleases = [];
+        let activeWindow = '30d';
+        let selectedId = null;
+
+        const USER_ICON = '<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>';
+
+        fetch('/api/me').then(r => r.ok ? r.json() : null).then(user => {
+            if (!user) return;
+            document.getElementById('currentUserName').textContent = user.preferred_username || user.email || '';
+        });
+
+        const windowButtons = document.getElementById('windowButtons');
+        WINDOWS.forEach(windowOption => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = windowOption.label;
+            button.dataset.window = windowOption.id;
+            button.className = 'px-3 py-1.5 rounded-lg text-sm font-semibold border';
+            button.addEventListener('click', () => {
+                activeWindow = windowOption.id;
+                paintWindowButtons();
+                draw();
+            });
+            windowButtons.appendChild(button);
+        });
+
+        function paintWindowButtons() {
+            windowButtons.querySelectorAll('button').forEach(button => {
+                const on = button.dataset.window === activeWindow;
+                button.setAttribute('aria-pressed', on ? 'true' : 'false');
+                button.className = on
+                    ? 'rounded-md bg-white px-3 py-1.5 text-sm font-medium text-blue-800 shadow-sm'
+                    : 'rounded-md px-3 py-1.5 text-sm font-medium text-blue-900/70 hover:text-blue-900';
+            });
+        }
+
+        function svgEl(name, attrs) {
+            const el = document.createElementNS(SVG_NS, name);
+            Object.entries(attrs || {}).forEach(([key, value]) => el.setAttribute(key, String(value)));
+            return el;
+        }
+
+        function formatLocal(iso) {
+            return new Date(iso).toLocaleString(undefined, {
+                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+            });
+        }
+
+        function formatTick(ms, span) {
+            const options = span <= 2 * 24 * 60 * 60 * 1000
+                ? { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+                : { month: 'short', day: 'numeric' };
+            return new Date(ms).toLocaleString(undefined, options);
+        }
+
+        function releasesInWindow() {
+            const windowOption = WINDOWS.find(item => item.id === activeWindow);
+            if (!windowOption.ms) return allReleases.slice();
+            const start = Date.now() - windowOption.ms;
+            return allReleases.filter(release => Date.parse(release.releasedAt) >= start);
+        }
+
+        function windowBounds(releases) {
+            const windowOption = WINDOWS.find(item => item.id === activeWindow);
+            if (windowOption.ms) {
+                const end = Date.now();
+                return { start: end - windowOption.ms, end };
+            }
+            if (!releases.length) {
+                const end = Date.now();
+                return { start: end - WINDOWS[2].ms, end };
+            }
+            let start = Math.min(...releases.map(release => Date.parse(release.releasedAt)));
+            let end = Math.max(...releases.map(release => Date.parse(release.releasedAt)));
+            if (end - start < 60 * 60 * 1000) {
+                const mid = (start + end) / 2;
+                start = mid - 30 * 60 * 1000;
+                end = mid + 30 * 60 * 1000;
+            }
+            const pad = (end - start) * 0.04;
+            return { start: start - pad, end: end + pad };
+        }
+
+        function draw() {
+            const releases = releasesInWindow();
+            const host = document.getElementById('chartHost');
+            const empty = document.getElementById('chartEmpty');
+            host.replaceChildren();
+
+            const counts = Object.fromEntries(ENVIRONMENTS.map(env => [env.id, 0]));
+            releases.forEach(release => { counts[release.environment] = (counts[release.environment] || 0) + 1; });
+            const legend = document.getElementById('envLegend');
+            legend.replaceChildren();
+            ENVIRONMENTS.forEach(env => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center gap-2 text-sm text-stone-600';
+                const swatch = document.createElement('span');
+                swatch.className = 'inline-block w-2.5 h-2.5 rounded-full';
+                swatch.style.background = env.color;
+                item.append(swatch, document.createTextNode(env.label + ' · ' + (counts[env.id] || 0)));
+                legend.appendChild(item);
+            });
+
+            if (!releases.length) {
+                empty.classList.remove('hidden');
+                document.getElementById('releaseDetail').textContent = 'Select a point to see who released it and when.';
+                return;
+            }
+            empty.classList.add('hidden');
+
+            const width = Math.max(host.clientWidth || 720, 720);
+            const height = 360;
+            const pad = { left: 92, right: 24, top: 28, bottom: 42 };
+            const plotWidth = width - pad.left - pad.right;
+            const plotHeight = height - pad.top - pad.bottom;
+            const laneHeight = plotHeight / ENVIRONMENTS.length;
+            const bounds = windowBounds(releases);
+            const span = bounds.end - bounds.start;
+            const xFor = (ms) => pad.left + ((ms - bounds.start) / span) * plotWidth;
+
+            const svg = svgEl('svg', { viewBox: `0 0 ${width} ${height}`, width: width, height: height, role: 'img' });
+            svg.appendChild(svgEl('title', {})).textContent = 'Releases by environment over time';
+
+            ENVIRONMENTS.forEach((env, index) => {
+                const y = pad.top + index * laneHeight;
+                svg.appendChild(svgEl('rect', {
+                    x: pad.left, y, width: plotWidth, height: laneHeight,
+                    fill: env.lane,
+                }));
+                const label = svgEl('text', {
+                    x: 12, y: y + laneHeight / 2, 'dominant-baseline': 'middle',
+                    fill: env.color, 'font-size': 12, 'font-weight': 600, 'font-family': 'ui-sans-serif, system-ui, sans-serif',
+                });
+                label.textContent = env.label;
+                svg.appendChild(label);
+            });
+
+            for (let tick = 0; tick <= 4; tick += 1) {
+                const ms = bounds.start + (span * tick) / 4;
+                const x = xFor(ms);
+                svg.appendChild(svgEl('line', { x1: x, x2: x, y1: pad.top, y2: pad.top + plotHeight, stroke: '#e7e5e4' }));
+                const tickLabel = svgEl('text', {
+                    x, y: height - 16, 'text-anchor': 'middle', fill: '#78716c', 'font-size': 11,
+                    'font-family': 'ui-sans-serif, system-ui, sans-serif',
+                });
+                tickLabel.textContent = formatTick(ms, span);
+                svg.appendChild(tickLabel);
+            }
+
+            const visibleIds = new Set(releases.map(release => release.id));
+            if (!visibleIds.has(selectedId)) {
+                selectedId = releases[releases.length - 1].id;
+            }
+
+            const placedLabels = [];
+            function placeLabel(text, cx, cy, color) {
+                const widthGuess = Math.max(72, text.length * 5.6);
+                for (const y of [cy - 14, cy + 18]) {
+                    const overlaps = placedLabels.some(label =>
+                        Math.abs(label.x - cx) < (label.w + widthGuess) / 2 && Math.abs(label.y - y) < 14
+                    );
+                    if (overlaps || y < 12 || y > height - 28) continue;
+                    const timeLabel = svgEl('text', {
+                        x: cx, y, 'text-anchor': 'middle', fill: color, 'font-size': 10,
+                        'font-family': 'ui-sans-serif, system-ui, sans-serif',
+                    });
+                    timeLabel.textContent = text;
+                    svg.appendChild(timeLabel);
+                    placedLabels.push({ x: cx, y, w: widthGuess });
+                    return;
+                }
+            }
+
+            releases.forEach(release => {
+                const envIndex = ENVIRONMENTS.findIndex(env => env.id === release.environment);
+                if (envIndex < 0) return;
+                const ms = Date.parse(release.releasedAt);
+                const cx = xFor(ms);
+                const cy = pad.top + envIndex * laneHeight + laneHeight / 2;
+                const env = ENVIRONMENTS[envIndex];
+                const point = svgEl('circle', {
+                    cx, cy, r: release.id === selectedId ? 8 : 6,
+                    fill: env.color, stroke: '#ffffff', 'stroke-width': 2, tabindex: 0, role: 'button',
+                });
+                point.style.cursor = 'pointer';
+                const title = svgEl('title', {});
+                title.textContent = env.label + ' · ' + formatLocal(release.releasedAt) + ' · ' + release.username;
+                point.appendChild(title);
+                point.addEventListener('click', () => selectRelease(release.id));
+                point.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        selectRelease(release.id);
+                    }
+                });
+                svg.appendChild(point);
+                placeLabel(new Date(ms).toLocaleString(undefined, {
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                }), cx, cy, env.color);
+            });
+
+            host.appendChild(svg);
+            showDetail(releases.find(release => release.id === selectedId));
+        }
+
+        function selectRelease(id) {
+            selectedId = id;
+            draw();
+        }
+
+        function showDetail(release) {
+            const detail = document.getElementById('releaseDetail');
+            detail.replaceChildren();
+            if (!release) {
+                detail.textContent = 'Select a point to see who released it and when.';
+                return;
+            }
+            const env = ENVIRONMENTS.find(item => item.id === release.environment);
+            const fields = [
+                ['Environment', env ? env.label : release.environment],
+                ['Local time', formatLocal(release.releasedAt)],
+                ['UTC', release.dateUtc + ' ' + release.timeUtc],
+                ['Operator', release.username],
+                ['Pipeline', TRIGGER_LABELS[release.pipelineTrigger] || release.pipelineTrigger],
+                ['Tenants', release.tenantList],
+            ];
+            if (release.crNumber) fields.push(['Change request', release.crNumber]);
+            if (release.changeSummary) fields.push(['Change', release.changeSummary]);
+            const grid = document.createElement('dl');
+            grid.className = 'grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3';
+            fields.forEach(([label, value]) => {
+                const item = document.createElement('div');
+                const dt = document.createElement('dt');
+                dt.className = 'text-[11px] font-medium uppercase tracking-[0.12em] text-stone-500';
+                dt.textContent = label;
+                const dd = document.createElement('dd');
+                dd.className = 'mt-0.5 text-sm text-stone-900';
+                dd.textContent = value;
+                item.append(dt, dd);
+                grid.appendChild(item);
+            });
+            detail.appendChild(grid);
+        }
+
+        function renderAudit(releases) {
+            const body = document.getElementById('auditBody');
+            const empty = document.getElementById('auditEmpty');
+            body.replaceChildren();
+            const prodOnly = releases.filter(release => release.environment === 'prod');
+            if (!prodOnly.length) {
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+            prodOnly.forEach(release => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-[#fafaf8]';
+
+                const userCell = document.createElement('td');
+                userCell.className = 'px-4 py-3 whitespace-nowrap';
+                const userWrap = document.createElement('div');
+                userWrap.className = 'flex items-center gap-2';
+                const avatar = document.createElement('span');
+                avatar.className = 'inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-700';
+                avatar.innerHTML = USER_ICON;
+                const userName = document.createElement('span');
+                userName.className = 'text-sm text-stone-900';
+                userName.textContent = release.username;
+                userWrap.append(avatar, userName);
+                userCell.appendChild(userWrap);
+                tr.appendChild(userCell);
+
+                const cells = [
+                    [release.dateUtc, 'px-4 py-3 whitespace-nowrap tabular-nums text-stone-700'],
+                    [release.timeUtc, 'px-4 py-3 whitespace-nowrap tabular-nums text-stone-700'],
+                    [release.crNumber || '', 'px-4 py-3 whitespace-nowrap font-mono text-xs font-medium text-rose-700'],
+                    [release.tenantList, 'px-4 py-3 whitespace-nowrap text-stone-700'],
+                    [TRIGGER_LABELS[release.pipelineTrigger] || release.pipelineTrigger, 'px-4 py-3 whitespace-nowrap text-stone-700'],
+                    [release.changeSummary || '—', 'px-4 py-3 whitespace-nowrap text-stone-500'],
+                ];
+                cells.forEach(([value, className]) => {
+                    const td = document.createElement('td');
+                    td.className = className;
+                    td.textContent = value;
+                    tr.appendChild(td);
+                });
+
+                const pipelineCell = document.createElement('td');
+                pipelineCell.className = 'px-4 py-3 whitespace-nowrap font-mono text-xs text-stone-700';
+                const pipelineUrl = release.gitlabWebUrl;
+                const safePipelineUrl = typeof pipelineUrl === 'string'
+                    && (pipelineUrl.startsWith('https://') || pipelineUrl.startsWith('http://'));
+                if (safePipelineUrl) {
+                    const link = document.createElement('a');
+                    link.href = pipelineUrl;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.className = 'underline underline-offset-2 hover:text-stone-900';
+                    link.textContent = release.gitlabPipelineId ? '#' + release.gitlabPipelineId : 'open';
+                    pipelineCell.appendChild(link);
+                } else {
+                    pipelineCell.textContent = release.gitlabPipelineId ? '#' + release.gitlabPipelineId : '—';
+                }
+                tr.appendChild(pipelineCell);
+                body.appendChild(tr);
+            });
+        }
+
+        async function load() {
+            const [chartResponse, auditResponse] = await Promise.all([
+                fetch('/api/releases'),
+                fetch('/api/releases/audit'),
+            ]);
+            if (chartResponse.status === 401 || auditResponse.status === 401) {
+                window.location = '/login?reason=unauthorized';
+                return;
+            }
+            if (!chartResponse.ok || !auditResponse.ok) {
+                document.getElementById('chartEmpty').classList.remove('hidden');
+                document.getElementById('chartEmpty').textContent = 'Could not load release history.';
+                return;
+            }
+            allReleases = (await chartResponse.json()).releases || [];
+            const auditReleases = (await auditResponse.json()).releases || [];
+            paintWindowButtons();
+            draw();
+            renderAudit(auditReleases);
+        }
+
+        window.addEventListener('resize', () => draw());
+        load();
+    </script>
+</body>
+</html>

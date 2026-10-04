@@ -1,0 +1,15 @@
+# Downstream job started by tenant_orchestrator. Prints every variable
+# the dev portal sent with the pipeline trigger.
+hello-world:
+  script:
+    - echo "Hello from ${CI_PROJECT_PATH}"
+    - echo "TARGET_ENV=${TARGET_ENV}"
+    - echo "TENANT_LIST=${TENANT_LIST}"
+    - echo "PIPELINE_TRIGGER=${PIPELINE_TRIGGER}"
+    - echo "TAINT=${TAINT}"
+    - echo "TRIGGERED_BY=${TRIGGERED_BY}"
+    - echo "CR_NUMBER=${CR_NUMBER}"
+    - echo "REPLACE_RESOURCE=${REPLACE_RESOURCE}"
+    - echo "TF_REFRESH=${TF_REFRESH}"
+    - echo "REPLACE_STATE=${REPLACE_STATE}"
+    - echo "SERVICES_LIST=${SERVICES_LIST}"
