@@ -6,6 +6,7 @@ Operators sign in with Keycloak and start a tenant release. The portal records w
 
 | Doc | What it is |
 |---|---|
+| [docs/rewrite.md](docs/rewrite.md) | Build the portal yourself, file by file, from an empty folder |
 | [docs/tutorial.md](docs/tutorial.md) | How a click becomes tenant jobs, and where each rule lives |
 | [docs/architecture.md](docs/architecture.md) | End-to-end picture: local wiring, sequence, variables, ledger |
 | [docs/eks.md](docs/eks.md) | Helm install on EKS through the existing Istio gateway |
