@@ -41,6 +41,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
 
 # Copy application assets and set ownership 📁
 COPY --chown=10001:10001 main.py auth.py config.py model.py gitlab_client.py logging_utils.py releases_store.py .
+COPY --chown=10001:10001 app/ ./app/
 COPY --chown=10001:10001 public/ ./public/
 
 USER 10001:10001

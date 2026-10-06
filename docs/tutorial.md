@@ -97,7 +97,12 @@ Local Keycloak is for this repo only. It runs `start-dev` and imports `keycloak/
 | Deploy form, spinner, rocket, popup | `public/index.html` |
 | Releases chart, production table, CSV link | `public/releases.html` |
 | Sign-in page and Keycloak callback | `auth.py` |
-| Auth gate, trigger, polling, security headers | `main.py` |
+| App wiring | `main.py` |
+| Token load and ledger startup | `app/startup.py` |
+| Sign-in gate and security headers | `app/middleware.py` |
+| Trigger and the one-in-flight lock | `app/trigger.py` |
+| Pipeline status polling | `app/pipelines.py` |
+| Release chart, production ledger, CSV | `app/releases.py` |
 | Field rules | `model.py` |
 | GitLab create and status calls | `gitlab_client.py` |
 | Ledger and the per-environment hold | `releases_store.py` |
